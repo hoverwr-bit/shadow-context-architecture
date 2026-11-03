@@ -1,188 +1,151 @@
 # Experiments: Evaluating Shadow Context Architecture
 
-- Status: Proposed protocol; no results claimed
-- Version: 0.1
+- Status: Proposed protocol; no empirical results claimed
+- Version: 0.2
 - Related documents: [RFC.md](./RFC.md), [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ## 1. Purpose
 
-This document proposes a reproducible comparison between a conventional long-running agent workflow and a workflow with a persistent main conversation plus fresh, task-scoped shadow agents.
+Evaluate whether a structured cockpit backed by versioned project files, combined with fresh task-scoped shadow execution, improves focus stability and context isolation without unacceptable cache, token, latency, or handoff costs.
 
-The experiment must test both benefits and costs. It must be possible for results to show that the architecture does not help, helps only for some task classes, or introduces unacceptable overhead.
+The experiment must allow negative results. It must not assume the proposed architecture wins.
 
 ## 2. Research questions
 
-- **RQ1 — Context accumulation:** Does fresh-per-task execution prevent previous task tool traces and intermediate work from accumulating in later execution contexts?
-- **RQ2 — Constraint retention:** Does a focused task package improve adherence to constraints that remain relevant across a sequence of tasks?
-- **RQ3 — Drift:** Does the architecture reduce degradation in task alignment over a long task sequence?
-- **RQ4 — Error localization:** Can reviewers more reliably identify which task or context package introduced an incorrect conclusion?
-- **RQ5 — Trade-offs:** What additional token, latency, orchestration, and tool costs are introduced?
-- **RQ6 — Main-context limits:** How does performance change as the persistent main conversation's own context grows or becomes inaccurate?
+- RQ1: Does moving project continuity into explicit project files reduce active cockpit-context growth?
+- RQ2: Does task focus derived from a pinned project snapshot reduce late-sequence drift and constraint misses?
+- RQ3: Does each fresh shadow avoid inheriting previous shadow execution history?
+- RQ4: Are errors easier to localize when task inputs, outputs, and project revisions are separately recorded?
+- RQ5: Can stable prompt-prefix design preserve cache reuse across fresh shadows?
+- RQ6: What are the total token, cache, latency, tool, and handoff costs?
+- RQ7: How sensitive is the architecture to stale, contradictory, or incomplete project files?
 
-## 3. Conditions
+## 3. Experimental conditions
 
-### Condition A — Long-running agent baseline
+### A — Long-running agent baseline
 
-One agent conversation performs the entire task sequence. It receives the same initial project information and tool permissions and retains context according to the baseline runtime's normal behavior.
+A conventional persistent agent performs a sequence of tasks in one accumulating execution conversation. Record normal context handling, compaction, and tool-trace behavior.
 
-### Condition B — Shadow workflow
+### B — Parent-agent plus sub-agent baseline
 
-A persistent main conversation maintains continuity and dispatches a newly initialized shadow for each task. Each shadow receives a task package assembled from the main conversation's current context. Only the structured return package is added to the main conversation; the shadow's full intermediate execution trace is not.
+A competent conventional multi-agent/sub-agent setup uses a persistent parent agent and fresh or isolated workers as supported by the platform. This tests whether the proposal adds value beyond existing sub-agent patterns. Record what the parent agent does and what context it retains.
 
-### Optional diagnostic condition C — Fresh agent without persistent orchestration
+### C — Cockpit + project files + fresh shadow runtime
 
-A new independent agent is started for every task but receives only the task prompt and static source material, without a persistent main conversation maintaining structured continuity. This condition is optional and helps distinguish the value of fresh execution from the value of persistent orchestration.
+A non-agent cockpit holds structured communication and references. Versioned project files define current project state. A separate dispatch mechanism, which may be manual during the pilot, starts a fresh shadow for each task using a pinned task snapshot. The cockpit does not reason as a persistent agent, plan, or coordinate tool execution.
 
-Do not compare B against C alone and claim the effect of the complete architecture. The primary comparison is A versus B.
+Condition C is the proposed architecture. Do not quietly implement it as a parent Agent delegating to child Agents.
 
 ## 4. Controls
 
-Hold constant where feasible:
-- model version and inference settings;
-- task sequence and task difficulty;
-- initial project facts and source documents;
-- tool set, permissions, and tool versions;
-- acceptance criteria and evaluator rubric;
-- external environment and test fixtures.
+Hold constant where possible: model and inference settings; task sequence and difficulty; initial project facts and source materials; tool set and permissions; snapshot content and evidence quality; scoring rubric and evaluator instructions.
 
-Record all differences that cannot be held constant, including runtime context policies, hidden memory behavior, tool-session persistence, and token accounting. Randomize condition order where practical. Use multiple independent runs rather than relying on a single demonstration.
+Record runtime differences, context policies, memory behavior, tool-session persistence, prompt-cache configuration, and token accounting. Randomize condition order where practical. Use repeated trials.
 
 ## 5. Workload design
 
-Build a task sequence with a known ground truth and explicit scoring criteria. Include:
+Use a multi-task project workload with known ground truth. Include:
+1. durable constraints introduced early and needed later;
+2. decisions that later tasks must respect;
+3. irrelevant tool output and retrieval noise;
+4. misleading but plausible intermediate evidence;
+5. project-state updates and superseded facts;
+6. user corrections that must propagate;
+7. legitimate cross-task artifact reuse by explicit reference;
+8. narrow and broad task boundaries;
+9. deliberately stale or contradictory project-file conditions;
+10. a task requiring evidence-backed changes to project state.
 
-1. **Persistent constraints:** important requirements introduced early and needed again many tasks later.
-2. **Decision dependencies:** later tasks depend on earlier accepted decisions.
-3. **Irrelevant noise:** tool output and retrieved material that are not needed for the task.
-4. **Misleading evidence:** plausible but incorrect findings that should be challenged.
-5. **State changes:** a project fact changes, requiring the agent to distinguish current from stale information.
-6. **Correction events:** the user corrects an earlier mistaken assumption; later tasks must use the correction.
-7. **Cross-task reuse:** an earlier artifact is legitimately needed by a later task.
-8. **Task boundary variation:** include narrow tasks and broader tasks to expose packaging and handoff costs.
+Publish fixtures and scoring criteria before evaluating outputs.
 
-Avoid designing every task to favor the shadow workflow. Publish the task sequence and scoring rubric before examining comparative results.
-
-## 6. Metrics and operational definitions
+## 6. Metrics
 
 | Metric | Operational definition | Reporting |
 |---|---|---|
-| Context accumulation | Tokens or equivalent context units retained in the active execution context over task index | Per-task curve and total |
-| Main-context growth | Persistent main conversation context size over task index | Per-task curve |
-| Constraint adherence | Fraction of applicable critical constraints satisfied | Pass rate and failure examples |
-| Task quality | Blinded score against task-specific acceptance criteria | Mean, distribution, rubric |
-| Task drift | Increase in objective deviation across sequence position | Score by task index |
-| Repeated work | Duplicate completed actions not required by changed state | Count per task |
-| Error localization | Reviewer's ability to identify the task/package associated with an injected or observed error | Accuracy and time |
-| Correction propagation | Whether an explicit user correction is respected by later tasks | Pass rate |
-| Handoff overhead | Context packaging and result transfer tokens, time, and operations | Per-task and total |
-| End-to-end cost | Model tokens, tool cost, wall-clock time, and orchestration cost | Per-task and total |
-| Isolation compliance | Whether a shadow can access prior shadow conversation state | Pass/fail from runtime tests |
+| Cockpit active-context growth | Tokens in active cockpit context over task index | Per-task curve |
+| Project-state footprint | Size and structure of authoritative active project files | Version-by-version |
+| Task focus | Blinded score against task objective and acceptance criteria | Per-task and late-sequence |
+| Constraint adherence | Applicable critical constraints satisfied | Pass rate and failures |
+| Task quality | Correctness and completeness against ground truth | Distribution |
+| Drift | Change in objective deviation over sequence position | Per-task curve |
+| Correction propagation | Later tasks correctly apply explicit user corrections | Pass rate |
+| Error localization | Reviewer identifies source task/revision of injected error | Accuracy and time |
+| Shadow isolation | Prior shadow marker/history inaccessible to later shadow | Pass/fail by channel |
+| Prompt cache | Cached input tokens / eligible input tokens, where exposed | Per-task and aggregate |
+| Stable-prefix reuse | Common prefix length and actual cache-hit evidence | Per-task |
+| Handoff overhead | Snapshot preparation and return-package tokens/time | Per-task and total |
+| End-to-end cost | Uncached + cached model tokens, tools, latency, orchestration | Per-task and total |
 
-Do not equate lower token count with better quality. Report quality, reliability, and cost together.
+Do not use cache hit rate alone as a success metric. Report actual cached token counts and cost because providers may define cache eligibility and billing differently.
 
-## 7. Measuring attention dilution
+## 7. Prompt-cache experiment
 
-Attention dilution is not directly observable as one scalar. Use behavioral proxies rather than claiming to measure an internal model state directly.
+Run a controlled sub-experiment with the same model/provider/runtime where possible:
+- C1: stable system/project rules first, dynamic state and task content last;
+- C2: same semantic content but dynamic sections interleaved or reordered;
+- C3: stable project prefix with state snapshots pinned by revision, changing only the task suffix;
+- C4: state revision changes between tasks, measuring how much prefix remains reusable.
 
-Suggested proxies:
-- missed critical constraints;
-- increased reliance on stale facts;
-- increased task drift;
-- failure to apply explicit corrections;
-- repeated rediscovery of already established facts;
-- increased variance in task quality as the sequence progresses.
+Record exact request prefixes, eligible input tokens, cached input tokens, cache creation/read cost, latency, model, routing if available, and time between requests. Repeat within and beyond documented cache retention windows.
 
-Report these as observable behavioral outcomes, not as direct measurements of attention itself.
+A fresh shadow context does not imply a cache miss. Identical prompts do not guarantee a hit. If the provider does not expose cache telemetry, mark the metric unavailable rather than infer it from latency.
 
 ## 8. Isolation tests
 
-Before evaluating task quality, verify the runtime boundary:
+1. Put a unique harmless marker only in shadow 1's conversation context.
+2. Start shadow 2 with no marker and no access to shadow 1's transcript.
+3. Test whether shadow 2 can access the marker.
+4. Repeat for persistent memory, tool sessions, temporary files, shared workspaces, and external services.
+5. Record each channel as isolated, shared, or unknown.
 
-1. Run shadow 1 and create a unique harmless marker in its conversation-only context.
-2. Start shadow 2 with a task package that does not contain the marker and without access to shadow 1's transcript.
-3. Ask shadow 2 whether it has the marker or prior-task context.
-4. Repeat with memory, tool sessions, temporary files, caches, and other state channels where the runtime exposes them.
-5. Record which channels are isolated, shared, or unknown.
+A model's self-report is not proof. Verify using runtime configuration and observable access controls. Never use secrets as markers.
 
-A model's statement that it has no memory is not sufficient proof. The runtime configuration and observable access controls must support the claim. Do not put secrets or sensitive data in isolation markers.
+## 9. Project-file integrity tests
 
-## 9. Error localization protocol
+Inject controlled cases: stale state file; conflicting decision revisions; missing provenance; unaccepted proposal presented as fact; accepted correction not reflected in current state.
 
-Create a set of controlled errors, such as:
-- a stale fact included in one task package;
-- a misleading tool result in one shadow run;
-- an incorrect conclusion in one return package;
-- an omitted constraint during packaging.
+Measure whether the task package detects or propagates these defects. This tests the architecture's dependency on project-file quality rather than assuming externalization makes facts correct.
 
-Give reviewers the relevant task packages, return packages, and available evidence without telling them which condition produced the error. Ask them to identify the likely point of introduction, the evidence needed to confirm it, and the scope of downstream impact.
+## 10. Error localization protocol
 
-Score attribution accuracy and time-to-localize. Preserve ambiguous cases rather than forcing a single attribution.
+Inject errors at distinguishable points: project source, snapshot construction, shadow reasoning, return package, and project-file update. Give reviewers relevant artifacts without revealing the injected point. Score attribution accuracy and time-to-localize.
 
-## 10. Analysis plan
+## 11. Analysis plan
 
-- Pre-register hypotheses, workload, exclusion rules, and scoring rubric before running the main comparison.
-- Use paired task sequences where possible so conditions face equivalent work.
-- Report per-task and aggregate results.
-- Show distributions and uncertainty, not only averages.
-- Separate task-quality outcomes from token/cost outcomes.
-- Analyze early versus late tasks to identify sequence effects.
-- Report main-context growth separately from shadow-context size.
-- Include failures, blocked tasks, missing data, and protocol deviations.
-- Avoid causal claims if runtime differences or unequal context inputs confound the comparison.
+- Pre-register workload, hypotheses, exclusions, and scoring.
+- Use paired task sequences where possible.
+- Report early, middle, and late task performance.
+- Separate cockpit context, project-file footprint, shadow context, and total system cost.
+- Report cache hits only when provider telemetry supports them.
+- Show distributions and uncertainty, not just averages.
+- Include failed, blocked, and incomplete runs.
+- Do not claim causality where runtime or context quality differs materially.
 
-For small exploratory pilots, label results as preliminary and avoid statistical overstatement.
+## 12. Minimum results table
 
-## 11. Minimum result table
+| Metric | A: Long-running | B: Parent + sub-agent | C: Cockpit + shadow |
+|---|---:|---:|---:|
+| Task acceptance rate | TBD | TBD | TBD |
+| Critical constraint pass rate | TBD | TBD | TBD |
+| Late-sequence focus score | TBD | TBD | TBD |
+| Cockpit/parent context growth | TBD | TBD | TBD |
+| Project-state integrity | N/A or measured | N/A or measured | TBD |
+| Shadow isolation | N/A | TBD | TBD |
+| Cached input tokens | TBD | TBD | TBD |
+| Handoff overhead | TBD | TBD | TBD |
+| End-to-end cost | TBD | TBD | TBD |
+| Error localization accuracy | TBD | TBD | TBD |
 
-| Category | Condition A | Condition B | Notes |
-|---|---:|---:|---|
-| Task acceptance rate | TBD | TBD | Same rubric |
-| Critical constraint pass rate | TBD | TBD | Applicable constraints only |
-| Late-sequence drift score | TBD | TBD | Blinded evaluation |
-| Duplicate action count | TBD | TBD | Normalize by task count |
-| Error localization accuracy | TBD | TBD | Controlled error set |
-| Execution context tokens | TBD | TBD | Per-task and total |
-| Main context tokens | N/A or runtime equivalent | TBD | Record actual availability |
-| Handoff overhead | TBD | TBD | Include packaging and return |
-| End-to-end cost | TBD | TBD | Tokens, tools, latency |
-| Isolation test result | N/A | TBD | Document verified channels |
+Do not fill TBD values with estimates.
 
-Do not fill TBD cells with estimates. Publish raw measurements and explain unavailable metrics.
+## 13. Threats to validity
 
-## 12. Threats to validity
+Model nondeterminism; unequal project-state curation; hidden runtime memory or shared tool state; provider cache opacity and routing effects; task fixtures favoring one workflow; evaluator bias; inaccurate token accounting; task granularity effects; poor project-file quality; manual dispatch during pilot differing from automated runtime.
 
-- **Model nondeterminism:** repeated runs may vary substantially.
-- **Unequal context quality:** the shadow condition may benefit from more carefully curated inputs.
-- **Runtime confounds:** hidden memory or tool-session behavior may differ between conditions.
-- **Task representativeness:** a synthetic workload may not reflect real engineering or knowledge work.
-- **Evaluator bias:** reviewers may favor a novel architecture; use blinded scoring where possible.
-- **Token accounting gaps:** platforms may not expose all context or hidden runtime costs.
-- **Task granularity:** results may depend heavily on how tasks are split.
-- **Main-context bottleneck:** a degraded main conversation can contaminate every later task package.
+## 14. Pilot proposal
 
-## 13. Suggested pilot
-
-A small first pilot can use:
-- 1 documented task sequence of 12–20 tasks;
-- 3 independent runs per condition as an exploratory minimum;
-- one fixed model/runtime configuration where possible;
-- a pre-written constraint checklist and acceptance rubric;
-- at least 2 reviewers for a subset of quality and error-localization scoring.
-
-This is a feasibility pilot, not enough by itself to establish general superiority. Increase runs and workload diversity before drawing strong conclusions.
-
-## 14. Publication checklist
-
-- [ ] Publish task fixtures and source materials, subject to licensing and privacy.
-- [ ] Publish exact prompts and task context packages.
-- [ ] Record model, runtime, tool, and permission configuration.
-- [ ] Publish the scoring rubric before evaluating outputs.
-- [ ] Record all trials, including failed and blocked runs.
-- [ ] Report context growth, quality, isolation, and cost separately.
-- [ ] Identify unobservable or unmeasured runtime state.
-- [ ] Document deviations and limitations.
-- [ ] Invite independent reproduction and critical review.
+Start with one documented 12–20 task project sequence and at least three exploratory runs per condition. Use one fixed model/runtime where possible, a published constraint checklist, and blinded review for a subset. This is a feasibility pilot, not proof of general superiority.
 
 ## 15. Current status
 
-No empirical results are claimed in this document. All metrics and procedures are proposals until a pilot is executed and its evidence is published.
+No empirical results are claimed. This protocol is a proposal until a pilot is executed and evidence is published.

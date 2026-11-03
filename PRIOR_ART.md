@@ -1,163 +1,85 @@
-# Prior Art: Context Isolation, Sub-agents, and Persistent Orchestration
+# Prior Art: Context Isolation, Project-State Continuity, and Agent Orchestration
 
 - Status: Preliminary literature and product scan
 - Research snapshot: 2026-11-04
-- Scope: Public documentation and engineering articles reviewed for conceptual overlap
 - Related documents: [RFC.md](./RFC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [EXPERIMENTS.md](./EXPERIMENTS.md)
 
 ## 1. Executive finding
 
-The core mechanism proposed by Shadow Context Architecture is **not novel in isolation**.
+The previous draft compared the proposal to sub-agent systems as though it were a persistent main Agent delegating work. That framing was incorrect and is withdrawn.
 
-Fresh task-scoped contexts, isolated sub-agents, persistent orchestrators, and returning concise results to a parent conversation are already present in public agent products and frameworks. The closest overlap found in this scan is Claude Code Sub-agents. Anthropic's long-running-agent harness also describes context resets with structured handoffs. OpenAI's multi-agent documentation describes independent sub-agent contexts coordinated by a main agent.
+The proposal now being evaluated is materially different in its role separation:
+- the persistent cockpit is a structured user-facing workspace, not an Agent or orchestrator;
+- versioned project files, rather than the conversation transcript, hold durable project state and current focus;
+- a fresh shadow execution context performs each bounded task;
+- the dispatch/runtime mechanism is separate and intentionally unspecified at this stage;
+- only a bounded, reviewable result returns to the cockpit, and accepted project changes are versioned.
 
-This does not establish that every detail of this proposal is identical to an existing implementation. It does mean the project must not claim invention of:
-- fresh context windows for delegated work;
-- parent/child agent orchestration;
-- keeping sub-agent intermediate work out of the main conversation;
-- returning a summary or final result to the main agent;
-- context reset plus structured handoff as a long-running-work technique.
+This distinction does not make the underlying mechanisms unprecedented. Fresh contexts, external artifacts, structured handoffs, sub-agents, and workflow runtimes are established areas of prior art. The question is whether this exact operating model and its measurable properties offer a useful contribution.
 
-The defensible contribution, if further specified and validated, is better framed as an **explicit operating contract and evaluation protocol** for a persistent conversational continuity owner that dispatches a fresh, stateless execution instance for each bounded task.
+## 2. Comparison
 
-This is a preliminary scan, not a systematic literature review or patent search. Absence of a match in this document is not proof that no prior implementation exists.
-
-## 2. Closest prior art
-
-| System / source | Documented mechanism | Overlap | Important distinction or open question |
+| System / pattern | Publicly documented mechanism | Relationship to this proposal | Important distinction / unknown |
 |---|---|---|---|
-| Claude Code Sub-agents | Each sub-agent has its own context; starts fresh without the parent conversation; works independently; only its result is returned to the main conversation | Very high | This is the closest product-level match to the task-local shadow lifecycle and return boundary. The exact persistence, reuse, and runtime guarantees should be checked against the implementation/version under test. |
-| Anthropic long-running-agent harness | Context resets clear the context and start a fresh agent, with structured handoff artifacts carrying prior state and next steps | Very high | Focuses on continuing a long-running project across agent sessions, rather than explicitly defining a persistent user-facing conversation as the sole continuity owner for every bounded task. |
-| OpenAI Agents API Multi-agent | Main agent delegates to independent sub-agents with their own contexts; main coordinates and combines results | Very high | Documents the core parent/sub-agent split. The proposal's stricter per-task lifecycle and no cross-task shadow history need to be treated as explicit invariants, not assumed from the generic multi-agent pattern. |
-| Anthropic context engineering / sub-agent architectures | Focused sub-agents use clean contexts and return distilled summaries to a lead agent | High | Describes the general pattern and rationale, rather than the complete lifecycle contract proposed here. |
-| OpenAI Agents SDK Sessions | Sessions preserve conversation history across runs; context can be trimmed or summarized | Partial | A persistent-session strategy for continuity, not itself a fresh-per-task execution architecture. |
-| OpenAI Agents SDK Handoffs | Handoff can transfer conversation control; by default the receiving agent sees conversation history unless input filtering changes it | Partial / contrasting | Demonstrates that “handoff” does not automatically mean context isolation. The input boundary must be explicit. |
-| Google ADK | Agents can communicate through shared invocation/session state; workflow agents can pass state between steps | Partial | Shared state is a different choice from strict task-local execution contexts. |
-| LangGraph Persistence | Checkpointers preserve thread-scoped graph state; stores hold longer-term cross-thread data | Partial | Provides persistence primitives and memory scopes, not the complete shadow lifecycle by itself. |
+| Claude Code Sub-agents | Isolated sub-agent contexts; fresh workers can perform delegated tasks and return results to a main conversation | Strong overlap in disposable execution and trace containment | The documented parent remains an Agentic conversation. This proposal's cockpit is not a parent Agent; project files are the continuity substrate. |
+| Anthropic long-running-agent harness | Context resets with structured handoff artifacts and durable progress information | Strong overlap in fresh execution and externalized state | Primarily addresses continuity across successive agent sessions. This proposal applies task-scoped disposal while the user-facing cockpit remains a non-agent workspace. |
+| OpenAI multi-agent patterns | A main Agent delegates to independent sub-agents and coordinates results | Overlap in independent task contexts | The main Agent/coordinator role is specifically absent from the proposed cockpit. |
+| OpenAI Agents SDK Sessions / Handoffs | Persistent sessions, conversation history, handoff and input filtering | Relevant context-continuity and transfer primitives | These mechanisms do not by themselves define a non-agent cockpit backed by project files. Handoff alone does not prove isolation. |
+| Google ADK | Agent workflows and shared session/invocation state | Relevant workflow and state primitives | Shared state and agent workflow composition differ from the proposed explicit project-file source of truth and disposable task context. |
+| LangGraph persistence | Thread-scoped checkpoints and longer-term stores | Relevant persistence primitives | Persistence primitives can support external state, but do not prescribe this complete role separation. |
 
-## 3. Source notes
+This is a targeted scan, not a systematic academic survey, patent search, or exhaustive implementation search. Product behavior should be checked against the exact version used in any implementation.
 
-### 3.1 Claude Code Sub-agents — closest match
+## 3. What is already established prior art
 
-Anthropic's public guide describes sub-agents as isolated instances with their own context windows. A sub-agent starts fresh without the parent conversation history, performs its task, and returns only the relevant result to the main conversation. The guide explicitly positions this as a way to keep research, logs, and other noisy work out of the main thread.
+The project must not claim to have invented:
+- fresh context windows or isolated sub-agent execution;
+- context reset and structured handoff;
+- external project files or durable state artifacts;
+- returning concise results instead of full execution traces;
+- workflow engines that launch and monitor task executions;
+- prompt-prefix caching or stable-prefix prompt organization.
 
-Source:
-- [How and when to use subagents in Claude Code](https://claude.com/resources/articles/subagents-in-claude-code)
+## 4. Candidate distinction to investigate
 
-A separate Anthropic article describes sub-agents as a way to move noisy work into another context, with only the answer returning to the main session:
-- [Maximizing the value of your Claude Code sessions](https://claude.com/blog/maximizing-the-value-of-your-claude-code-sessions)
+The candidate contribution is the combined architecture contract:
 
-**Assessment:** The proposal's “fresh worker, isolated execution, result-only return” is already a documented product pattern. Any novelty claim must go beyond those mechanics.
+1. **Non-agent cockpit:** persistent user-facing interaction remains a structured workspace rather than an autonomous control agent.
+2. **Project-file focus:** active project state and current focus are explicit, versioned artifacts, not something reconstructed from a long conversation transcript.
+3. **Ephemeral task execution:** every bounded task starts a fresh shadow context, with no inherited prior shadow execution history.
+4. **No automatic trace backflow:** raw tool traces and intermediate work do not become cockpit history by default.
+5. **Human-visible correction:** results are presented for inspection; accepted corrections update authoritative project files.
+6. **Cache-aware but cache-independent execution:** stable prompt prefixes may be reused where supported, without depending on cache state for correctness.
+7. **Evaluation of the whole lifecycle:** compare focus stability, project-state integrity, isolation, cache behavior, error localization, and total cost against competent sub-agent baselines.
 
-### 3.2 Anthropic long-running-agent harness
+These are candidate differentiators, not proof of novelty. Some or all may be implementable using existing tools and frameworks.
 
-Anthropic describes context resets as clearing the context window and starting a fresh agent, combined with a structured handoff containing the previous agent's state and next steps. It contrasts this with compaction, which shortens history in place but does not create a clean slate.
+## 5. The key comparison question
 
-Source:
-- [Harness design for long-running apps](https://www.anthropic.com/research/harness-design-long-running-apps)
-- [Effective harnesses for long-running agents](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents)
+> Does a non-agent cockpit backed by versioned project state, combined with disposable task execution and a separate dispatch mechanism, provide measurable benefits over a conventional parent-Agent/sub-agent architecture?
 
-**Assessment:** Context reset plus structured handoff is established prior art. The proposal should distinguish task-by-task ephemeral execution from a sequence of sessions that continue one long-running project through durable progress artifacts.
+A fair baseline must be competently configured. It should not be intentionally weakened by poor context curation or excessive transcript retention.
 
-### 3.3 OpenAI Multi-agent
+The evaluation should test whether project state remains accurate; whether tasks start from explicit reproducible snapshots; whether the cockpit avoids execution noise; whether task focus and late-sequence quality improve; whether dispatch and packaging overhead outweigh benefits; whether cache reuse is retained; and whether existing frameworks can implement the same role separation without material changes.
 
-OpenAI documents a multi-agent pattern in which an agent delegates work to independent sub-agents. Each sub-agent has its own context, can work in parallel, and the main agent coordinates and combines the results.
+## 6. Recommended claim level
 
-Source:
-- [Multi-agent](https://developers.openai.com/api/docs/guides/agents-api/multi-agent)
+- **Safe to claim:** This repository proposes a specific separation of cockpit, project-state artifacts, dispatch/runtime, and ephemeral execution, plus an evaluation protocol.
+- **Requires implementation evidence:** A runtime actually enforces the specified isolation and lifecycle.
+- **Requires comparative evidence:** The model improves focus stability, error localization, or total efficiency over competent alternatives.
+- **Do not claim yet:** The architecture is unprecedented, guarantees constant context size, guarantees cache hits, or outperforms existing frameworks.
 
-**Assessment:** The parent coordinator and independent worker split is established prior art. The proposal's value, if any, lies in making strict lifecycle, context ownership, and evaluation rules explicit.
+## 7. References
 
-### 3.4 OpenAI Sessions and Handoffs
+- Anthropic, [How and when to use subagents in Claude Code](https://claude.com/resources/articles/subagents-in-claude-code).
+- Anthropic, [Harness design for long-running apps](https://www.anthropic.com/research/harness-design-long-running-apps).
+- Anthropic, [Effective harnesses for long-running agents](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents).
+- OpenAI, [Multi-agent](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+- OpenAI, [Agents SDK Sessions](https://openai.github.io/openai-agents-python/sessions/).
+- OpenAI, [Agents SDK Handoffs](https://openai.github.io/openai-agents-python/handoffs/).
+- Google, [ADK custom agents](https://github.com/google/adk-docs/blob/main/docs/agents/custom-agents.md).
+- LangChain, [LangGraph persistence](https://github.com/langchain-ai/docs/blob/main/src/oss/langgraph/persistence.mdx).
 
-The Agents SDK Sessions documentation describes preserving conversation history across runs. OpenAI's context-management cookbook discusses trimming and summarization, including the risks of carrying too much history or losing important facts.
+## 8. Limitations
 
-Sources:
-- [Agents SDK Sessions](https://openai.github.io/openai-agents-python/sessions/)
-- [Context Engineering: Short-Term Memory Management with Sessions](https://developers.openai.com/cookbook/examples/agents_sdk/session_memory)
-
-OpenAI's Handoffs documentation notes that a receiving agent normally sees the conversation history unless an input filter or related configuration changes what is passed.
-
-Source:
-- [Agents SDK Handoffs](https://openai.github.io/openai-agents-python/handoffs/)
-
-**Assessment:** These documents show why context continuity and execution isolation must be treated as separate design decisions. A handoff alone is not proof of a clean context.
-
-### 3.5 Google ADK and LangGraph
-
-Google ADK documents shared session state and invocation context as mechanisms for communication between agents and workflow steps.
-
-Source:
-- [Google ADK custom agents](https://github.com/google/adk-docs/blob/main/docs/agents/custom-agents.md)
-
-LangGraph documents thread-scoped checkpoint persistence and longer-term stores.
-
-Source:
-- [LangGraph persistence](https://github.com/langchain-ai/docs/blob/main/src/oss/langgraph/persistence.mdx)
-
-**Assessment:** These are relevant state-management primitives, but they do not by themselves establish the complete per-task ephemeral shadow model.
-
-## 4. What may still distinguish this proposal
-
-The following are candidate differentiators to specify and test. They are **not claims of proven originality**.
-
-1. **One explicit continuity owner.** The persistent main conversation is the sole conversational continuity owner. Shadows do not become peer long-lived agents and do not maintain cross-task execution history.
-2. **Fresh instance for every bounded task.** The lifecycle rule is mandatory, not merely an optional optimization used when a coordinator decides delegation is convenient.
-3. **No execution-trace backflow by default.** Tool calls, search trails, intermediate outputs, and task-local logs remain outside the main conversation. Only a bounded return package is passed back.
-4. **User-visible correction loop.** The main conversation presents the shadow's conclusion so the user can identify a wrong judgment; corrections then update the persistent conversation's structured context.
-5. **Explicit context ownership contract.** The design distinguishes persistent dialogue/continuity, task input, task-local execution state, durable external artifacts, and returned conclusions.
-6. **Longitudinal evaluation target.** The proposed experiment measures whether this arrangement reduces cross-task contamination and late-sequence drift, while separately measuring whether the persistent main conversation itself becomes a bottleneck.
-
-Items 1–5 may already be achievable with existing sub-agent systems. The likely contribution is therefore a clear, testable architecture profile and evaluation method, not necessarily a new runtime primitive.
-
-## 5. The strongest challenge the project must answer
-
-> Why is this more than using Claude Code Sub-agents or OpenAI Multi-agent with a persistent coordinator?
-
-A credible answer cannot be “because the worker is called a shadow.” It must specify operational invariants and demonstrate a measurable advantage over a well-configured sub-agent baseline.
-
-At minimum, a comparative implementation should test:
-
-- Does every bounded task receive a genuinely new execution context?
-- Can any previous shadow transcript, hidden memory, or tool session leak into the next shadow?
-- Does the main conversation receive only the agreed return package, rather than the worker's raw execution trace?
-- How is the persistent main context kept accurate as it accumulates user dialogue and accepted conclusions?
-- Does user correction propagate reliably to later tasks?
-- Does this improve late-sequence task quality, constraint retention, or error localization enough to justify packaging, orchestration, and token overhead?
-
-A baseline using existing sub-agents must be configured competently. Comparing against a deliberately poor single-agent baseline would not establish a meaningful contribution.
-
-## 6. Revised positioning
-
-Recommended project description:
-
-> Shadow Context Architecture is an experimental operating model for long-running AI work. It makes conversational continuity the responsibility of one persistent main session, while each bounded task is executed by a fresh, disposable worker context. The worker's intermediate execution trace stays isolated; only a structured result returns for review and possible incorporation into the main session.
->
-> The proposal does not claim to invent sub-agents or context resets. It asks whether enforcing this lifecycle as a consistent context-ownership contract can measurably reduce cross-task context contamination, improve error localization, and preserve task quality over long interaction sequences.
-
-Recommended claim level:
-- **Safe to claim:** This repository proposes and specifies an explicit architecture profile and a validation protocol.
-- **Requires implementation evidence:** A given runtime actually enforces the isolation and lifecycle invariants.
-- **Requires comparative experimental evidence:** The architecture improves reliability, drift, or error localization over existing sub-agent approaches.
-- **Do not claim yet:** The design is novel, solves context dilution, or outperforms existing agent frameworks.
-
-## 7. Limitations of this scan
-
-- This is a targeted scan of public product documentation and engineering articles, not a systematic academic survey.
-- Product behavior may change; implementation-specific claims should be pinned to tested versions.
-- Public documentation may omit internal runtime details.
-- No patent, academic citation graph, or exhaustive open-source implementation search was performed.
-- Similarity of concepts does not prove identical implementation, and different names do not prove novelty.
-
-## 8. References
-
-1. Anthropic, [How and when to use subagents in Claude Code](https://claude.com/resources/articles/subagents-in-claude-code).
-2. Anthropic, [Maximizing the value of your Claude Code sessions](https://claude.com/blog/maximizing-the-value-of-your-claude-code-sessions).
-3. Anthropic, [Harness design for long-running apps](https://www.anthropic.com/research/harness-design-long-running-apps).
-4. Anthropic, [Effective harnesses for long-running agents](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents).
-5. OpenAI, [Multi-agent](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
-6. OpenAI, [Agents SDK Sessions](https://openai.github.io/openai-agents-python/sessions/).
-7. OpenAI, [Context Engineering: Short-Term Memory Management with Sessions](https://developers.openai.com/cookbook/examples/agents_sdk/session_memory).
-8. OpenAI, [Agents SDK Handoffs](https://openai.github.io/openai-agents-python/handoffs/).
-9. Google, [ADK custom agents](https://github.com/google/adk-docs/blob/main/docs/agents/custom-agents.md).
-10. LangChain, [LangGraph persistence](https://github.com/langchain-ai/docs/blob/main/src/oss/langgraph/persistence.mdx).
+This scan is preliminary. It does not establish novelty, non-obviousness, patentability, or exhaustive absence of similar systems. Similarity of individual mechanisms does not prove identical architecture; different terminology does not prove a new contribution.

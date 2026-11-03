@@ -1,199 +1,208 @@
-# Architecture: Persistent Main Conversation and Ephemeral Shadows
+# Architecture: Structured Cockpit + Ephemeral Task Runtime
 
 - Status: Design note
-- Version: 0.1
+- Version: 0.2
 - Related specification: [RFC.md](./RFC.md)
 
-## 1. Design invariant
+## 1. Architectural thesis
 
-The main conversation is persistent and owns continuity. A shadow is created fresh for one bounded task, executes within its own temporary context, returns a structured result, and ends.
+The system does not use a persistent main Agent to coordinate long-running work.
 
-The architecture is not a pair of peer agents with equal memory. It is a persistent context manager delegating isolated execution.
+It separates four concerns:
+1. **Cockpit:** persistent user-facing workspace for structured communication, project focus, review, and correction.
+2. **Project files:** versioned source of truth for project goals, constraints, decisions, progress, and evidence.
+3. **Dispatch/runtime mechanism:** starts task execution and enforces boundaries; implementation responsibility remains open.
+4. **Shadow:** fresh, disposable execution context for one bounded task.
 
-## 2. Logical components
+The cockpit is not a planner, orchestrator, or tool-running agent. The shadow does not carry continuity between tasks.
 
-### 2.1 Main conversation / orchestrator
+## 2. Components and responsibilities
 
-Responsibilities:
-- maintain user-facing dialogue and relevant continuity;
-- maintain structured context such as goals, decisions, constraints, current state, and unresolved questions;
-- define a bounded task and its acceptance criteria;
-- assemble the task context package;
-- select the references and permissions available to the shadow;
-- receive and review the return package;
-- expose the result to the user so incorrect judgments can be identified and corrected;
-- decide what conclusions should be retained for future tasks.
+### 2.1 Cockpit / structured workspace
 
-The main conversation does not need to ingest the shadow's complete tool trace, intermediate reasoning, or raw logs.
+- displays current project focus and structured status;
+- records user communication, corrections, confirmations, and open questions;
+- links to authoritative project files and task artifacts;
+- presents shadow return packages for human review;
+- provides an interaction surface for accepting or rejecting proposed project-state changes.
 
-### 2.2 Shadow execution instance
+It should not become a duplicate of all project documents or a sink for tool logs. It does not independently decide task plans or act as the persistent execution controller.
 
-Responsibilities:
-- start as a new task-scoped execution context;
-- consume the task context package;
-- perform analysis, retrieval, tool calls, code execution, and tests as required;
-- distinguish observed evidence from assumptions and recommendations;
-- return the requested outcome with sufficient evidence and caveats;
-- terminate after the task.
+### 2.2 Project files
 
-A shadow must not rely on another shadow's conversation history. If it needs an earlier artifact or decision, that information must be supplied by the main conversation or retrieved from an explicitly authorized source.
+- hold versioned project goals, constraints, decisions, specifications, progress, and evidence;
+- identify current versus superseded information;
+- preserve provenance and revision identifiers where practical;
+- provide task snapshots from known revisions;
+- receive accepted updates through normal versioned changes.
 
-### 2.3 External sources and artifacts
+Project files, not the chat transcript, are the durable project-state authority.
 
-Repositories, specifications, issue trackers, test reports, and other authorized systems may hold durable project facts and outputs. They are sources the main conversation can reference when preparing a task package. Their existence does not turn a shadow into a stateful agent.
+### 2.3 Dispatch/runtime mechanism (open)
+
+Required capabilities, regardless of implementation:
+- accept a bounded task request;
+- resolve the required project snapshot and references;
+- initialize a fresh shadow context;
+- scope tools, credentials, filesystem access, and network permissions;
+- collect the structured return package;
+- close the task execution context;
+- record enough audit metadata to verify lifecycle and isolation.
+
+This mechanism may be user-triggered, host-provided, or implemented as a separate non-conversational service. The architecture does not currently prescribe which. It must not silently be modeled as a persistent main Agent.
+
+### 2.4 Shadow execution instance
+
+- starts with a fresh task-scoped context;
+- receives the task package and explicitly authorized project references;
+- performs analysis, retrieval, tool calls, code execution, and tests;
+- distinguishes observed evidence from assumptions and recommendations;
+- returns a bounded result with evidence and proposed changes;
+- ends after the task.
+
+It must not inherit a previous shadow's transcript or task-local working context.
 
 ## 3. Data flow
 
-```text
-             Persistent continuity boundary
-   USER <------> MAIN CONVERSATION / ORCHESTRATOR
-                         |
-                         | 1. task + selected context
-                         v
-                 [Fresh shadow instance]
-                         |
-             2. task-local work and tool use
-                         |
-                         v
-                 [Return package]
-                         |
-                         | 3. result only, not full trace
-                         v
-   USER <------> MAIN CONVERSATION / ORCHESTRATOR
-                         |
-              4. review, correction, retention
-                         |
-                         v
-                Updated structured context
+    USER <----> COCKPIT
+                   |
+                   | reads / discusses / proposes updates
+                   v
+            VERSIONED PROJECT FILES
+                   |
+                   | pinned task snapshot + references
+                   v
+           DISPATCH / RUNTIME MECHANISM
+                (implementation TBD)
+                   |
+                   v
+           FRESH SHADOW EXECUTION
+             | tools / retrieval / tests |
+                   |
+                   v
+            STRUCTURED RETURN PACKAGE
+                   |
+                   v
+           COCKPIT: display and review
+                   |
+             user acceptance/correction
+                   |
+                   v
+           VERSIONED PROJECT FILES
 
-        Next task => another fresh shadow instance
-```
+    Next task -> new shadow context
 
-The boundary is logical and must be enforced by the runtime. Merely naming a second conversation a “shadow” does not establish isolation.
+The diagram intentionally does not show the cockpit calling a sub-agent as an Agent-to-Agent delegation pattern. The task-start mechanism is a separate unresolved component.
 
-## 4. Task context package
+## 4. Project-state model
 
-A practical package can use this conceptual shape:
+A practical project layout may include:
+- PROJECT.md: purpose, scope, authoritative entry point;
+- STATE.md: current progress, active milestone, blockers, next verified actions;
+- DECISIONS.md: accepted decisions, rationale, date, supersession links;
+- CONSTRAINTS.md: durable must/must-not requirements;
+- SPEC/: detailed requirements and architecture;
+- TASKS/: task definitions, snapshots, and acceptance criteria;
+- EVIDENCE/: test reports, measurements, source references, and review records.
 
-```yaml
-task_id: "unique-task-reference"
-objective: "One bounded outcome"
-acceptance_criteria:
-  - "Observable completion condition"
-relevant_context:
-  current_state: "Only the state needed for this task"
-  accepted_decisions: []
-constraints:
-  must: []
-  must_not: []
-references:
-  - "Repository path, document, or source"
-tool_permissions:
-  allowed: []
-  denied: []
-uncertainties:
-  - "Known unknowns; do not silently assume"
-output_contract:
-  format: "structured result"
-  include_evidence: true
-```
+This is a suggested organization, not a required repository layout. Avoid copying the entire project into every task prompt. Select relevant files and pin exact revisions.
 
-This is illustrative, not a mandatory serialization format. The package should be minimal enough to avoid unnecessary context transfer but complete enough to preserve task-critical meaning.
+## 5. Task snapshot contract
 
-### Context selection questions
+Illustrative fields:
+- task_id and project_id;
+- snapshot revision and exact file revisions;
+- one bounded objective;
+- observable acceptance criteria;
+- relevant decisions and known uncertainties;
+- authorized references;
+- tool, filesystem, and network permissions;
+- output schema and evidence requirements.
 
-Before dispatch, the main conversation should be able to answer:
-- What exactly is the requested outcome?
-- Which prior decisions materially constrain this task?
-- Which facts are current, and how are they supported?
-- Which references can the shadow inspect?
-- What is explicitly unknown?
-- What would count as completion or failure?
+The snapshot should be immutable for the duration of the task. If authoritative project state changes mid-run, the task should either continue against its pinned snapshot or be explicitly restarted with a new one.
 
-## 5. Return package
+## 6. Return package contract
 
-A practical return shape:
+Illustrative fields:
+- task_id and status: completed, partial, blocked, or failed;
+- snapshot revision used;
+- concise result;
+- evidence-backed findings;
+- assumptions, limitations, and open questions;
+- artifacts created or changed;
+- proposed project-file updates;
+- tests performed and results.
 
-```yaml
-task_id: "unique-task-reference"
-status: "completed | partial | blocked | failed"
-result: "Concise outcome"
-findings:
-  - statement: "Evidence-backed finding"
-    evidence: ["source or artifact reference"]
-recommendations:
-  - "Recommendation, clearly not a confirmed fact"
-assumptions: []
-open_questions: []
-artifacts: []
-context_update_candidates:
-  - "Potentially reusable information for main conversation review"
-```
+The return package is not the full execution transcript. It must be sufficient for review and identify the snapshot it used.
 
-The shadow should return enough evidence to make its result inspectable. It should not transfer its entire working transcript by default. The main conversation remains responsible for deciding what becomes retained context.
+## 7. Context layering and cache-aware ordering
 
-## 6. Lifecycle and state transitions
+Candidate prompt order:
+1. stable system rules and output protocol;
+2. stable project conventions and architecture;
+3. current versioned project snapshot;
+4. task-specific objective, inputs, and acceptance criteria.
 
-| State | Meaning | Next state |
-|---|---|---|
-| Prepared | Task and relevant context assembled | Created |
-| Created | Fresh shadow runtime initialized | Executing |
-| Executing | Task-local work is underway | Returning / Failed / Cancelled |
-| Returning | Structured result is emitted | Closed |
-| Closed | Shadow context is ended | None |
-| Failed / Cancelled | Run did not complete normally | Closed after status is recorded |
+Stable layers should be identical where practical if the provider's cache requires exact prefix reuse. Dynamic task content belongs later. A project-state update changes the relevant dynamic section; it should not require rewriting unrelated stable sections.
 
-The lifecycle is per task. A later task starts at Prepared and receives a new execution instance.
+This is an optimization opportunity, not a guarantee. Prompt caching is provider-specific and may depend on minimum prefix length, retention time, request routing, model, tool definitions, and other factors. Never keep stale project state just to preserve a cache hit.
 
-## 7. Isolation requirements
+## 8. Lifecycle and state transitions
 
-A runtime claiming to implement this architecture should verify:
+| State | Meaning |
+|---|---|
+| Prepared | Task and immutable snapshot defined |
+| Initialized | Fresh execution context created |
+| Executing | Shadow performs task-local work |
+| Returning | Structured result emitted |
+| Closed | Active execution context ended |
+| Failed / Cancelled | Failure recorded; context closed |
 
-1. **Conversation isolation:** a new shadow receives no previous shadow transcript.
-2. **Memory isolation:** no shadow-specific persistent memory is silently reused across tasks.
-3. **Tool-session isolation:** tool sessions and temporary execution state are task-scoped or explicitly documented.
-4. **Permission scoping:** access is limited to the task's declared tools, files, credentials, and actions.
-5. **Artifact continuity by reference:** prior outputs are reused only through explicit references supplied or authorized for the current task.
-6. **Return boundary:** only the defined return package is sent into the main conversation by default.
-7. **Termination semantics:** task completion ends the shadow's active context; any retained artifact or audit log is separately identified.
+Each new bounded task must begin with a new execution context. Reusing a previous shadow conversation is outside the defining architecture.
 
-These requirements distinguish genuine lifecycle isolation from simply opening multiple tabs or threads.
+## 9. Isolation and audit requirements
 
-## 8. Failure handling
+A conforming implementation should test and document:
+- conversation history isolation;
+- cross-task memory isolation;
+- tool-session and credential scope;
+- filesystem and temporary-file scope;
+- external service state and caches;
+- explicit artifact reuse by reference;
+- return-package boundary;
+- runtime termination semantics.
 
-- **Insufficient package:** shadow returns a clarification request or blocked status instead of inventing missing context.
-- **Conflicting context:** shadow identifies the conflict and cites the competing sources.
-- **Tool failure:** shadow reports the failed operation, impact, and whether the task is partial.
-- **Acceptance criteria not met:** shadow returns partial/failed status and identifies unmet criteria.
-- **Incorrect conclusion:** main conversation and user can challenge the result; corrected information is retained by the main conversation as appropriate.
-- **Runtime cannot guarantee isolation:** implementation must disclose the limitation and must not claim full statelessness.
+Do not equate ending a chat transcript with deleting every external artifact or log. Retained audit evidence must be separately identified and access-controlled.
 
-## 9. Architecture decisions versus implementation choices
+## 10. Failure handling
 
-The following are defining properties:
-- persistent main conversation;
-- fresh shadow per bounded task;
-- no cross-task shadow execution history;
-- task-specific context supplied by the main conversation;
-- bounded return to the main conversation;
-- shadow lifecycle ends after its task.
+- Missing required project state: return blocked or clarification-needed, do not silently infer.
+- Conflicting project files: report conflict and identify competing revisions.
+- Stale snapshot: disclose the snapshot revision; restart only through an explicit new task.
+- Tool failure: report impact and partial status.
+- Failed acceptance criteria: identify unmet criteria.
+- Incorrect shadow judgment: cockpit presents evidence for user challenge; accepted correction updates project files.
+- Isolation not guaranteed: disclose unisolated channels; do not claim full statelessness.
+- Cache miss: treat as a performance observation, not a correctness failure.
 
-The following remain implementation choices:
-- JSON, YAML, or another package format;
-- one model or different models for main and shadow;
-- synchronous or asynchronous dispatch;
-- exact tool/runtime technology;
-- whether evidence artifacts are stored in Git, another system, or both;
-- whether a human explicitly approves every context update.
+## 11. Defining invariants vs implementation choices
 
-Implementation choices must not undermine the defining properties.
+Defining:
+- cockpit is not an Agent or orchestrator;
+- project files hold durable project state;
+- each bounded task uses a fresh shadow context;
+- no previous shadow execution history is inherited;
+- task execution traces do not automatically enter cockpit context;
+- results return through a bounded structured contract;
+- accepted project-state changes are versioned.
 
-## 10. Open design questions
+Open implementation choices:
+- task dispatch trigger and component;
+- runtime/provider/model;
+- synchronous or asynchronous execution;
+- package serialization;
+- project repository technology;
+- cache strategy and provider-specific controls;
+- approval policy for project updates.
 
-- How should the main conversation detect stale or contradictory structured context?
-- Should task packages carry provenance and timestamps for each important fact?
-- Which tasks are too broad to qualify as one bounded shadow run?
-- What minimum audit metadata should survive shadow termination?
-- How can runtime isolation be tested rather than merely asserted?
-
-See [EXPERIMENTS.md](./EXPERIMENTS.md) for a proposed validation plan.
+See [EXPERIMENTS.md](./EXPERIMENTS.md) for validation.
