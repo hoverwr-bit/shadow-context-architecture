@@ -131,7 +131,7 @@ class OpenAIResponsesAdapter:
         required = {
             "schema_version", "task_id", "run_id", "snapshot_id", "status",
             "result", "findings", "assumptions", "limitations", "open_questions",
-            "artifacts", "proposed_project_updates",
+            "artifacts", "proposed_project_updates", "tests", "metrics",
         }
         missing = required.difference(result)
         if missing:
