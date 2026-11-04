@@ -70,15 +70,15 @@ class OpenAIResponsesAdapter:
             "text": {"format": {"type": "json_object"}},
         }
 
-    def execute(self, package: dict[str, Any]) -> dict[str, Any]:
-        """Perform one API request. This method may incur usage charges."""
+    def execute_raw_request(self, request_body: dict[str, Any]) -> tuple[dict[str, Any], float]:
+        """Send an already-built Responses API request and return raw response + latency."""
         api_key = os.environ.get(self.api_key_env)
         if not api_key:
             raise RuntimeError(
                 f"{self.api_key_env} is not set; request was not sent"
             )
 
-        payload = json.dumps(self.build_request(package)).encode("utf-8")
+        payload = json.dumps(request_body).encode("utf-8")
         request = Request(
             "https://api.openai.com/v1/responses",
             data=payload,
@@ -99,6 +99,11 @@ class OpenAIResponsesAdapter:
             raise RuntimeError(f"OpenAI Responses API request failed: {exc}") from exc
 
         elapsed_ms = round((time.monotonic() - started) * 1000, 2)
+        return raw, elapsed_ms
+
+    def execute(self, package: dict[str, Any]) -> dict[str, Any]:
+        """Perform one API request. This method may incur usage charges."""
+        raw, elapsed_ms = self.execute_raw_request(self.build_request(package))
         return self.normalize_response(raw, package, elapsed_ms=elapsed_ms)
 
     def normalize_response(
