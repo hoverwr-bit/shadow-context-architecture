@@ -61,6 +61,16 @@ Only an explicit call to `adapter.execute(package)` sends a billable API request
 
 The request uses an explicit cache breakpoint on the stable developer content, followed by the changing task/project content. Keep the configured cache key stable at workspace level; do not put run IDs or task IDs in it. See [Runtime Adapter Contract](../RUNTIME_ADAPTER.md).
 
+You can also inspect the same request using the CLI; this command writes JSON locally and does not call the API:
+
+```bash
+PYTHONPATH=demo python -m shadow_demo build-openai-request \
+  --run-dir ./.shadow-demo/runs/TASK-001/<RUN_ID> \
+  --model your-enabled-model-id \
+  --cache-key shadow-demo:your-workspace:v1 \
+  --output ./openai-request.json
+```
+
 ## What this proves
 
 - Each `prepare` call creates a new run ID and a task-specific snapshot.
