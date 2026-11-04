@@ -13,6 +13,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from shadow_demo.runtime import OpenAIResponsesAdapter
+
 
 def _json_write(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -134,6 +136,27 @@ def run_shadow(run_dir: Path) -> None:
     print(f"Shadow finished: {result['status']} — {output_path.resolve()}")
 
 
+def build_openai_request(
+    run_dir: Path,
+    model: str,
+    cache_key: str,
+    output_path: Path | None = None,
+) -> dict:
+    """Build and optionally save a provider request without sending it."""
+    package_path = run_dir / "input" / "task_package.json"
+    if not package_path.is_file():
+        raise FileNotFoundError(f"Prepared task package missing: {package_path}")
+    adapter = OpenAIResponsesAdapter(model=model, prompt_cache_key=cache_key)
+    request_body = adapter.build_request_from_file(package_path)
+    rendered = json.dumps(request_body, indent=2, ensure_ascii=False) + "\\n"
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
+    else:
+        print(rendered, end="")
+    return request_body
+
+
 def inspect_result(run_dir: Path) -> None:
     result_path = run_dir / "output" / "return.json"
     if not result_path.is_file():
@@ -205,6 +228,15 @@ def main() -> None:
     p_prepare.add_argument("--task", required=True)
     p_run = sub.add_parser("run", help="Run one fresh mock shadow process")
     p_run.add_argument("--run-dir", type=Path, required=True)
+    p_request = sub.add_parser(
+        "build-openai-request",
+        help="Build a Responses API request JSON without sending it",
+    )
+    p_request.add_argument("--run-dir", type=Path, required=True)
+    p_request.add_argument("--model", required=True)
+    p_request.add_argument("--cache-key", required=True)
+    p_request.add_argument("--output", type=Path)
+
     p_inspect = sub.add_parser("inspect", help="Inspect the structured return package")
     p_inspect.add_argument("--run-dir", type=Path, required=True)
     p_accept = sub.add_parser("accept", help="Review or explicitly accept proposed project updates")
@@ -219,6 +251,8 @@ def main() -> None:
         prepare(args.workspace, args.task)
     elif args.command == "run":
         run_shadow(args.run_dir)
+    elif args.command == "build-openai-request":
+        build_openai_request(args.run_dir, args.model, args.cache_key, args.output)
     elif args.command == "inspect":
         inspect_result(args.run_dir)
     elif args.command == "accept":
