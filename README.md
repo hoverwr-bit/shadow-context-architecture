@@ -7,6 +7,7 @@ An experimental architecture proposal separating a persistent **structured cockp
 - [Prior-art scan](PRIOR_ART.md)
 - [Experiment protocol](EXPERIMENTS.md)
 - [Cache experiment and provider notes](CACHE_EXPERIMENT.md)
+- [Cache Experiment Harness](CACHE_HARNESS.md)
 - [Runtime adapter contract](RUNTIME_ADAPTER.md)
 - [Minimal runnable lifecycle demo](demo/README.md)
 
