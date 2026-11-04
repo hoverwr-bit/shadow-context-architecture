@@ -37,7 +37,7 @@ The normalizer records provider-reported:
 
 - model and response ID
 - elapsed request time
-- input, cached, cache-write, output, and total tokens
+- input, cached, cache-write, output, and total tokens (including TTL-specific cache-write breakdowns where returned)
 - stable-prefix and dynamic-suffix SHA-256 hashes
 - cache key and breakpoint mode
 
@@ -50,7 +50,7 @@ The normalizer rejects output whose `schema_version`, `task_id`, `run_id`, or `s
 ## Deliberate v0.1 limitations
 
 - No function tools, browser, filesystem, shell, credentials, or network access are exposed to the model.
-- No retries or automatic fallback are performed.
+- No retries or automatic fallback are performed. A separate Cache Experiment Harness can send raw requests for controlled measurement, but only with an explicit execution flag.
 - No API request is made by `build_request`; `execute` is the explicit billable boundary.
 - `store=false` is an API response-storage setting, not a claim that all provider-side retention is disabled.
 - The adapter does not claim to provide a secure execution sandbox. Production isolation and tool permissioning remain separate runtime responsibilities.
