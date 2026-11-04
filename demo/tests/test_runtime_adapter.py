@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from shadow_demo.runtime import OpenAIResponsesAdapter
+from shadow_demo.cli import build_openai_request, init_workspace, prepare
 
 
 def sample_package():
@@ -23,6 +24,25 @@ class OpenAIAdapterTests(unittest.TestCase):
             model="gpt-6",
             prompt_cache_key="shadow-demo:workspace-alpha:v1",
         )
+
+    def test_cli_dry_run_builds_request_from_prepared_package_without_network(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "workspace"
+            init_workspace(workspace)
+            run_dir = prepare(workspace, "TASK-001")
+            output_path = Path(tmp) / "request" / "body.json"
+            request = build_openai_request(
+                run_dir,
+                "test-model",
+                "workspace-stable-key",
+                output_path,
+            )
+            saved = __import__("json").loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(request, saved)
+            self.assertEqual(saved["prompt_cache_key"], "workspace-stable-key")
 
     def test_request_places_explicit_breakpoint_before_dynamic_suffix(self):
         request = self.adapter.build_request(sample_package())
