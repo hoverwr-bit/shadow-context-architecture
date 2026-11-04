@@ -2,7 +2,7 @@
 
 - Status: Proposed protocol; no empirical results claimed
 - Version: 0.2
-- Related documents: [RFC.md](./RFC.md), [ARCHITECTURE.md](./ARCHITECTURE.md)
+- Related documents: [RFC.md](./RFC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CACHE_EXPERIMENT.md](./CACHE_EXPERIMENT.md)
 
 ## 1. Purpose
 
@@ -88,7 +88,7 @@ Run a controlled sub-experiment with the same model/provider/runtime where possi
 
 Record exact request prefixes, eligible input tokens, cached input tokens, cache creation/read cost, latency, model, routing if available, and time between requests. Repeat within and beyond documented cache retention windows.
 
-A fresh shadow context does not imply a cache miss. Identical prompts do not guarantee a hit. If the provider does not expose cache telemetry, mark the metric unavailable rather than infer it from latency.
+A fresh shadow context does not imply a cache miss. Identical prompts do not guarantee a hit. If the provider does not expose cache telemetry, mark the metric unavailable rather than infer it from latency. For OpenAI-specific breakpoint, routing-key, minimum-prefix, and telemetry requirements, see [CACHE_EXPERIMENT.md](./CACHE_EXPERIMENT.md).
 
 ## 8. Isolation tests
 
