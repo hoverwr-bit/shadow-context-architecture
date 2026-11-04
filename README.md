@@ -7,6 +7,7 @@ An experimental architecture proposal separating a persistent **structured cockp
 - [Prior-art scan](PRIOR_ART.md)
 - [Experiment protocol](EXPERIMENTS.md)
 - [Cache experiment and provider notes](CACHE_EXPERIMENT.md)
+- [Runtime adapter contract](RUNTIME_ADAPTER.md)
 - [Minimal runnable lifecycle demo](demo/README.md)
 
 The cockpit is not a main Agent or orchestrator. Versioned project files hold durable project state. Each bounded task receives a fresh shadow context and returns a bounded, reviewable result. The dispatch/runtime implementation remains an open design question.
