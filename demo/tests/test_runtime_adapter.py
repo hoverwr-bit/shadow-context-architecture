@@ -96,7 +96,7 @@ class OpenAIAdapterTests(unittest.TestCase):
                         '"snapshot_id":"snap-123","status":"completed",'
                         '"result":"bad","findings":[],"assumptions":[],'
                         '"limitations":[],"open_questions":[],"artifacts":[],'
-                        '"proposed_project_updates":[]}'
+                        '"proposed_project_updates":[],"tests":[],"metrics":{}}'
                     ),
                 }],
             }],
