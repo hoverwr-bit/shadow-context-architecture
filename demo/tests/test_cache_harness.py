@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from shadow_demo.cache_harness import build_case_request, build_experiment_plan, summarize_records
+from pathlib import Path
+import tempfile
+
+from shadow_demo.cache_harness import build_case_request, build_experiment_plan, run_plan, summarize_records
 
 
 class CacheHarnessTests(unittest.TestCase):
@@ -48,6 +51,24 @@ class CacheHarnessTests(unittest.TestCase):
         self.assertEqual(len(request["input"]), 1)
         self.assertNotIn("prompt_cache_key", request)
         self.assertNotIn("prompt_cache_options", request)
+
+    def test_k4_request_attaches_comparison_response_id(self):
+        case = next(c for c in self.plan["cases"] if c["arm"] == "K4")
+        request = build_case_request(self.plan, case, "resp-k2-baseline")
+        self.assertEqual(
+            request["prompt_cache_options"]["comparison_response_id"],
+            "resp-k2-baseline",
+        )
+
+    def test_dry_run_renders_all_requests_without_records_or_api_calls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results"
+            summary = run_plan(self.plan, out, execute=False)
+            self.assertEqual(summary["network_calls"], 0)
+            self.assertEqual(summary["requests_built"], 10)
+            self.assertEqual(len(list((out / "requests").glob("*.json"))), 10)
+            self.assertTrue((out / "dry_run.json").is_file())
+            self.assertFalse((out / "records.jsonl").exists())
 
     def test_summary_aggregates_provider_usage(self):
         records = [
