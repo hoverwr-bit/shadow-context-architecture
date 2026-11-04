@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 from shadow_demo.runtime import OpenAIResponsesAdapter
@@ -40,7 +41,7 @@ class OpenAIAdapterTests(unittest.TestCase):
                 "workspace-stable-key",
                 output_path,
             )
-            saved = __import__("json").loads(output_path.read_text(encoding="utf-8"))
+            saved = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(request, saved)
             self.assertEqual(saved["prompt_cache_key"], "workspace-stable-key")
 
