@@ -148,7 +148,7 @@ def build_openai_request(
         raise FileNotFoundError(f"Prepared task package missing: {package_path}")
     adapter = OpenAIResponsesAdapter(model=model, prompt_cache_key=cache_key)
     request_body = adapter.build_request_from_file(package_path)
-    rendered = json.dumps(request_body, indent=2, ensure_ascii=False) + "\\n"
+    rendered = json.dumps(request_body, indent=2, ensure_ascii=False)
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(rendered, encoding="utf-8")
