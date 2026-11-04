@@ -27,6 +27,27 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(first_package["manifest"]["snapshot_id"], second_package["manifest"]["snapshot_id"])
         self.assertEqual(set(first_package["project_snapshot"]), {"STATE.md", "DECISIONS.md"})
 
+    def test_stable_prefix_survives_project_state_changes(self):
+        first = prepare(self.workspace, "TASK-001")
+        first_package = json.loads((first / "input" / "task_package.json").read_text())
+        stable_prefix = first_package["prompt"]["stable_prefix"]
+        self.assertTrue(first_package["prompt"]["rendered"].startswith(stable_prefix))
+
+        state_file = self.workspace / "project" / "STATE.md"
+        state_file.write_text(state_file.read_text() + "\n- New progress update.\n")
+        second = prepare(self.workspace, "TASK-001")
+        second_package = json.loads((second / "input" / "task_package.json").read_text())
+
+        self.assertEqual(
+            first_package["prompt_layout"]["stable_prefix_sha256"],
+            second_package["prompt_layout"]["stable_prefix_sha256"],
+        )
+        self.assertNotEqual(
+            first_package["prompt_layout"]["dynamic_suffix_sha256"],
+            second_package["prompt_layout"]["dynamic_suffix_sha256"],
+        )
+        self.assertEqual(first_package["prompt_layout"]["cache_status"], "not_measured")
+
     def test_shadow_runs_as_a_separate_process_and_returns_bounded_result(self):
         run_dir = prepare(self.workspace, "TASK-001")
         run_shadow(run_dir)

@@ -36,6 +36,7 @@ def init_workspace(workspace: Path) -> None:
         raise FileExistsError(f"Workspace is not empty: {workspace}")
     workspace.mkdir(parents=True, exist_ok=True)
     shutil.copytree(fixture_root / "project", workspace / "project", dirs_exist_ok=True)
+    shutil.copytree(fixture_root / "stable", workspace / "stable", dirs_exist_ok=True)
     shutil.copytree(fixture_root / "tasks", workspace / "tasks", dirs_exist_ok=True)
     (workspace / "runs").mkdir(exist_ok=True)
     print(f"Initialized workspace: {workspace.resolve()}")
@@ -57,6 +58,15 @@ def prepare(workspace: Path, task_id: str) -> Path:
     input_dir.mkdir(parents=True)
     project_snapshot: dict[str, str] = {}
     file_manifest: dict[str, dict[str, str]] = {}
+    stable_prompt_parts: list[str] = []
+
+    for relative in task.get("stable_prompt_files", ["BASE_RULES.md", "PROJECT_CONVENTIONS.md"]):
+        safe = _safe_relative(relative)
+        stable_root = (workspace / "stable").resolve()
+        source = (stable_root / safe).resolve()
+        if stable_root not in source.parents or not source.is_file():
+            raise FileNotFoundError(f"Required stable prompt file missing or outside stable root: {relative}")
+        stable_prompt_parts.append(source.read_text(encoding="utf-8").rstrip())
 
     for relative in task.get("project_files", []):
         safe = _safe_relative(relative)
@@ -77,12 +87,27 @@ def prepare(workspace: Path, task_id: str) -> Path:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "files": file_manifest,
     }
+    stable_prefix = "\n\n".join(stable_prompt_parts) + "\n"
+    dynamic_suffix = "## Task Input\n" + json.dumps(
+        {"task": task, "project_snapshot": project_snapshot},
+        ensure_ascii=False, sort_keys=True, indent=2
+    ) + "\n"
+    rendered_prompt = stable_prefix + "\n" + dynamic_suffix
+    prompt_layout = {
+        "stable_prefix_sha256": _sha256(stable_prefix.encode("utf-8")),
+        "dynamic_suffix_sha256": _sha256(dynamic_suffix.encode("utf-8")),
+        "stable_prefix_bytes": len(stable_prefix.encode("utf-8")),
+        "dynamic_suffix_bytes": len(dynamic_suffix.encode("utf-8")),
+        "cache_status": "not_measured",
+    }
     package = {
         "schema_version": "shadow-task-v1",
         "task": task,
         "run_id": run_id,
         "manifest": manifest,
         "project_snapshot": project_snapshot,
+        "prompt": {"stable_prefix": stable_prefix, "dynamic_suffix": dynamic_suffix, "rendered": rendered_prompt},
+        "prompt_layout": prompt_layout,
     }
     _json_write(input_dir / "task_package.json", package)
     _json_write(run_dir / "manifest.json", manifest)

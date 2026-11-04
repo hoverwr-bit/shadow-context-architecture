@@ -49,6 +49,10 @@ def execute(package_path: Path, output_path: Path) -> None:
             "prompt_cache": {
                 "status": "not_measured",
                 "reason": "The mock runner does not call a model provider.",
+                "stable_prefix_sha256": package["prompt_layout"]["stable_prefix_sha256"],
+                "dynamic_suffix_sha256": package["prompt_layout"]["dynamic_suffix_sha256"],
+                "stable_prefix_bytes": package["prompt_layout"]["stable_prefix_bytes"],
+                "dynamic_suffix_bytes": package["prompt_layout"]["dynamic_suffix_bytes"],
             },
         },
     }

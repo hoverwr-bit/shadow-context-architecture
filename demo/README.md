@@ -44,13 +44,14 @@ PYTHONPATH=demo python -m unittest discover -s demo/tests -v
 - The result is a bounded `shadow-return-v1` package.
 - Proposed project changes are preview-only until explicitly accepted.
 - Snapshot file hashes and an acceptance audit are recorded.
+- Stable prompt rules are placed before dynamic task/project state; their exact prefix hash is recorded so prefix stability can be tested independently of actual provider cache hits.
 - A regression test plants a marker in one shadow's return trace and verifies that a later task package does not inherit it.
 
 ## What this does not prove
 
 - The mock runner does not call an LLM or external tools.
 - A subprocess is **not** a security sandbox. It runs under the same OS user and may have access to files allowed to that user. Production isolation requires an explicitly configured container/VM, filesystem and network policy, credential scoping, and provider/session controls.
-- The demo does not measure prompt-cache hits. It reports `not_measured`; real cache metrics must come from provider telemetry.
+- The demo does not measure prompt-cache hits. It records stable-prefix and dynamic-suffix hashes/byte lengths, but reports cache status as `not_measured`; real cache metrics must come from provider telemetry. A stable prefix is a cache-eligibility design choice, not evidence of a cache hit.
 - A fresh process does not automatically mean all external state is fresh. Tool sessions, provider memory, shared filesystems, and external services require separate isolation tests.
 
 ## Replacing the mock runner
