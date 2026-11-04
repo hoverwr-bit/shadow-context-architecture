@@ -88,6 +88,19 @@ class LifecycleTests(unittest.TestCase):
         audit = json.loads((run_dir / "acceptance.json").read_text())
         self.assertEqual(audit["accepted_paths"], ["STATE.md"])
 
+    def test_stale_task_result_cannot_overwrite_newer_project_state(self):
+        run_dir = prepare(self.workspace, "TASK-001")
+        run_shadow(run_dir)
+        state_file = self.workspace / "project" / "STATE.md"
+        state_file.write_text(state_file.read_text() + "\n- Newer cockpit update.\n")
+        newer_state = state_file.read_text()
+
+        with self.assertRaisesRegex(RuntimeError, "Stale task result rejected"):
+            accept_result(self.workspace, run_dir, yes=True)
+
+        self.assertEqual(state_file.read_text(), newer_state)
+        self.assertFalse((run_dir / "acceptance.json").exists())
+
     def test_path_traversal_is_rejected(self):
         from shadow_demo.cli import _safe_relative
         with self.assertRaises(ValueError):

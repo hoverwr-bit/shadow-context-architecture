@@ -155,11 +155,33 @@ def accept_result(workspace: Path, run_dir: Path, yes: bool) -> None:
         return
 
     project_root = (workspace / "project").resolve()
+    runs_root = (workspace / "runs").resolve()
+    resolved_run_dir = run_dir.resolve()
+    if runs_root not in resolved_run_dir.parents:
+        raise ValueError("Run directory must be inside this workspace's runs directory")
+    manifest_path = resolved_run_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Snapshot manifest missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    # Validate every target and snapshot precondition before changing any file.
+    validated_updates: list[tuple[Path, dict]] = []
+    conflicts: list[str] = []
     for update in updates:
         relative = _safe_relative(update["path"])
         target = (project_root / relative).resolve()
-        if project_root not in target.parents and target != project_root:
+        if project_root not in target.parents:
             raise ValueError(f"Update escapes project directory: {relative}")
+        expected = manifest.get("files", {}).get(update["path"], {}).get("sha256")
+        if expected is None:
+            conflicts.append(f"{relative}: target was not part of the task snapshot")
+        elif not target.is_file() or _sha256(target.read_bytes()) != expected:
+            conflicts.append(f"{relative}: project file changed after this task snapshot")
+        validated_updates.append((target, update))
+    if conflicts:
+        raise RuntimeError("Stale task result rejected; no project files changed: " + "; ".join(conflicts))
+
+    for target, update in validated_updates:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(update["content"], encoding="utf-8")
 
@@ -169,8 +191,8 @@ def accept_result(workspace: Path, run_dir: Path, yes: bool) -> None:
         "snapshot_id": result["snapshot_id"],
         "accepted_paths": [item["path"] for item in updates],
     }
-    _json_write(run_dir / "acceptance.json", audit)
-    print(f"Accepted {len(updates)} project update(s). Audit: {run_dir / 'acceptance.json'}")
+    _json_write(resolved_run_dir / "acceptance.json", audit)
+    print(f"Accepted {len(updates)} project update(s). Audit: {resolved_run_dir / 'acceptance.json'}")
 
 
 def main() -> None:
