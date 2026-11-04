@@ -90,11 +90,11 @@ Report both cache-hit ratio and absolute cached tokens. A high ratio on a tiny p
 
 - K2 can achieve non-zero cached input tokens across separate Shadow runs when the stable prefix is long enough, identical, explicitly marked, and routed to an eligible cache entry.
 - K3 will reduce reuse compared with K2 when per-run keys fragment routing.
-- K4 will reduce or reset reuse when a changed tool schema/model changes the rendered prefix.
+- K4 will reduce reuse after a stable-prefix content/version change. Tool-schema and model changes are intentionally excluded from this first K4 arm so the experiment changes one variable at a time.
 - Cache misses can still occur under K2 because routing and cache residency are not guaranteed.
 - Total cost may not improve if cache writes, short reuse windows, or handoff overhead outweigh cache-read savings.
 
-## 7. What the current demo proves—and does not prove
+## 7. Harness implementation status
 
 The runnable demo now:
 - keeps stable rules/conventions before the dynamic task/project snapshot;
@@ -109,8 +109,12 @@ It does **not**:
 - observe `cached_tokens` or `cache_write_tokens`;
 - claim any real cache hit.
 
-The next provider integration should add an adapter that sends the serialized prompt with the provider's explicit cache boundary and captures usage telemetry. Until then, cache behavior remains an unmeasured hypothesis.
+The first provider adapter and an external Cache Experiment Harness are now implemented on the prototype branch. The harness can plan and render K0–K4 requests without network access, and can execute them only with an explicit --execute flag. It records actual input/cached/write tokens, TTL-specific cache-write breakdowns, latency, and prompt-cache diagnostics when returned by the provider. No live cache experiment has been run yet, so cache behavior remains unmeasured.
 
-## 8. Reference
+## 8. Harness details
+
+See [CACHE_HARNESS.md](CACHE_HARNESS.md) for experiment-arm definitions, commands, output artifacts, diagnostic interpretation, and execution safeguards. The harness requests a diagnostic comparison from the last K2 response for K4; diagnostic results are best-effort and do not alter cache behavior.
+
+## 9. Reference
 
 - OpenAI, [Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching), consulted 2026-11-04.
