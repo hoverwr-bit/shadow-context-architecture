@@ -48,7 +48,7 @@ from pathlib import Path
 from shadow_demo.runtime import OpenAIResponsesAdapter
 
 adapter = OpenAIResponsesAdapter(
-    model="gpt-6",
+    model="your-enabled-model-id",
     prompt_cache_key="shadow-demo:your-workspace:v1",
 )
 request_body = adapter.build_request_from_file(
