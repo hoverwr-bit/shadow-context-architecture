@@ -1,0 +1,11 @@
+{
+  "task_id": "TASK-001",
+  "objective": "Inspect the current project state and return a concise evidence-backed status.",
+  "acceptance_criteria": [
+    "Return package identifies the exact snapshot used.",
+    "Findings cite the snapshot file hash.",
+    "Proposed project changes are not applied automatically."
+  ],
+  "project_files": ["STATE.md", "DECISIONS.md"],
+  "stable_prompt_files": ["BASE_RULES.md", "PROJECT_CONVENTIONS.md"]
+}
